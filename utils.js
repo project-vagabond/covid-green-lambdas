@@ -136,6 +136,16 @@ async function getJwtSecret() {
   }
 }
 
+async function getNYSDataUrl() {
+  if (isProduction) {
+    const { NYS_STATS: url } = await getParameter('stats')
+
+    return url
+  } else {
+    return process.env.NYS_STATS
+  }
+}
+
 async function getSocrataKey() {
   if (isProduction) {
     const { SOCRATA_KEY: key } = await getSecret('stats')
@@ -180,6 +190,7 @@ module.exports = {
   getExposuresConfig,
   getInteropConfig,
   getJwtSecret,
+  getNYSDataUrl,
   getSocrataKey,
   isAuthorized,
   runIfDev

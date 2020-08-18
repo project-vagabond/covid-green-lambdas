@@ -1,7 +1,7 @@
 
 const axios = require('axios')
 const AWS = require('aws-sdk')
-const { getAssetsBucket, getSocrataKey, runIfDev } = require('./utils')
+const { getAssetsBucket, getNYSDataUrl, getSocrataKey, runIfDev } = require('./utils')
 
 
 /**
@@ -12,7 +12,8 @@ const { getAssetsBucket, getSocrataKey, runIfDev } = require('./utils')
  */
 const getStateWideTestingData = async (limit = 10000, offset = 0, data = []) => {
     const apiKey = await getSocrataKey();
-    const result = await axios.get(process.env.NYS_STATS, {
+    const nysDataUrl = await getNYSDataUrl();
+    const result = await axios.get(nysDataUrl, {
         headers: {
             'X-App-Token': apiKey
         },
