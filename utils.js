@@ -136,6 +136,16 @@ async function getJwtSecret() {
   }
 }
 
+async function getSocrataKey() {
+  if (isProduction) {
+    const { SOCRATA_KEY: key } = await getSecret('stats')
+
+    return key
+  } else {
+    return process.env.SOCRATA_KEY
+  }
+}
+
 function isAuthorized(token, secret) {
   try {
     const data = jwt.verify(token.replace(/^Bearer /, ''), secret)
@@ -170,6 +180,7 @@ module.exports = {
   getExposuresConfig,
   getInteropConfig,
   getJwtSecret,
+  getSocrataKey,
   isAuthorized,
   runIfDev
 }

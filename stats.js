@@ -1,7 +1,7 @@
-const apiKey = process.env.SOCRATA_KEY // Socrata API Key.
+
 const axios = require('axios')
 const AWS = require('aws-sdk')
-const { getAssetsBucket, runIfDev } = require('./utils')
+const { getAssetsBucket, getSocrataKey, runIfDev } = require('./utils')
 
 
 /**
@@ -11,6 +11,7 @@ const { getAssetsBucket, runIfDev } = require('./utils')
  * @throws Error if the response from the API is not 200.
  */
 const getStateWideTestingData = async (limit = 10000, offset = 0, data = []) => {
+    const apiKey = await getSocrataKey();
     const result = await axios.get(process.env.NYS_STATS, {
         headers: {
             'X-App-Token': apiKey
