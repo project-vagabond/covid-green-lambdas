@@ -6,10 +6,27 @@ on:
       - nys
 
 jobs:
+  verify-lint:
+    name: Enforce Linting Rules
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [ 12.x ]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Running lint with node ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm ci
+      - run: npm run lint
+
   publish-nys:
     if: github.repository_owner == 'project-vagabond'
     name: Publish lambdas for NYS
     runs-on: ubuntu-latest
+    needs: [ verify-lint ]
 
     steps:
     - name: Checkout
