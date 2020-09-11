@@ -10,6 +10,11 @@ exports.handler = function(event, context, callback) {
 
   if (!isAuthorized(event.authorizationToken, secret)) {
     callback('Unauthorized') // eslint-disable-line standard/no-callback-literal
+    // the eslint-callback-literal check is disabled because it's
+    // not applicable here. the check itself is designed to prevent
+    // people from returning error messages as string literals instead
+    // of using the Error class. This is at odds with the api provided to us.
+    // Alternatively s/callback/ca_ll__back/ to avoid the linter and comment.
   }
 
   callback(null, {
