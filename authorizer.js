@@ -1,32 +1,23 @@
 const { isAuthorized, runIfDev } = require('./utils')
 
-exports.handler = async function(event) {
+exports.handler = function(event, context, callback) {
   const secret = process.env.JWT_SECRET
   if (!secret) {
     console.log('Error acquiring secret from env')
 
-    // We're ignoring this lint error because the Lambdas are configured to respond
-    // to a thrown string 'JWTSecretError'. For the moment we'll leave this as is
-    // but long-term we should reconfigure the lambda to respond to a thrown Error
-    // instead of an explicit literal string
-    // TODO: reconfigure lambda to respond to a thrown Error instead of literal 'JWTSecretError'
-
-    // eslint-disable-next-line no-throw-literal
-    throw 'JWTSecretError'
+    throw Error('JWTSecretError')
   }
 
   if (!isAuthorized(event.authorizationToken, secret)) {
-    // We're ignoring this lint error because the Lambdas are configured to respond
-    // to a thrown string 'Unauthorized'. For the moment we'll leave this as is
-    // but long-term we should reconfigure the lambda to respond to a thrown Error
-    // instead of an explicit literal string. The configuration
-    // TODO: reconfigure lambda to respond to a thrown Error instead of literal 'Unauthorized'
-
-    // eslint-disable-next-line no-throw-literal
-    throw 'Unauthorized'
+    callback('Unauthorized') // eslint-disable-line standard/no-callback-literal
+    // the eslint-callback-literal check is disabled because it's
+    // not applicable here. the check itself is designed to prevent
+    // people from returning error messages as string literals instead
+    // of using the Error class. This is at odds with the api provided to us.
+    // Alternatively s/callback/ca_ll__back/ to avoid the linter and comment.
   }
 
-  return {
+  callback(null, {
     principalId: event.authorizationToken,
     policyDocument: {
       Version: '2012-10-17',
@@ -38,7 +29,7 @@ exports.handler = async function(event) {
         }
       ]
     }
-  }
+  })
 }
 
 runIfDev(exports.handler)
