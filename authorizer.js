@@ -1,7 +1,6 @@
 const { isAuthorized, runIfDev } = require('./utils')
 
 exports.handler = function(event, context, callback) {
-
   const secret = process.env.JWT_SECRET
   if (!secret) {
     console.log('Error acquiring secret from env')
@@ -10,7 +9,7 @@ exports.handler = function(event, context, callback) {
   }
 
   if (!isAuthorized(event.authorizationToken, secret)) {
-    callback("Unauthorized")
+    callback('Unauthorized') // eslint-disable-line standard/no-callback-literal
   }
 
   callback(null, {
