@@ -1,15 +1,29 @@
 const SQL = require('@nearform/sql')
-const { getDatabase, getExpiryConfig, runIfDev } = require('./utils')
+const {
+  withDatabase,
+  getExpiryConfig,
+  getTimeZone,
+  runIfDev
+} = require('./utils')
 
 async function createRegistrationMetrics(client) {
+  const timeZone = await getTimeZone()
+
   const sql = SQL`
     INSERT INTO metrics (date, event, os, version, value)
-    SELECT CURRENT_DATE, 'REGISTER', '', '', COUNT(id)
-    FROM registrations WHERE created_at::DATE = CURRENT_DATE
+    SELECT
+      (CURRENT_TIMESTAMP AT TIME ZONE ${timeZone})::DATE,
+      'REGISTER',
+      '',
+      '',
+      COUNT(id)
+    FROM registrations
+    WHERE
+      (created_at AT TIME ZONE ${timeZone})::DATE =
+      (CURRENT_TIMESTAMP AT TIME ZONE ${timeZone})::DATE
     ON CONFLICT ON CONSTRAINT metrics_pkey
     DO UPDATE SET value = EXCLUDED.value
-    RETURNING value
-  `
+    RETURNING value`
 
   const { rows } = await client.query(sql)
   const [{ value }] = rows
@@ -39,13 +53,32 @@ async function removeExpiredTokens(client, tokenLifetime) {
   console.log(`deleted ${rowCount} tokens older than ${tokenLifetime} minutes`)
 }
 
-exports.handler = async function() {
-  const client = await getDatabase()
-  const { codeLifetime, tokenLifetime } = await getExpiryConfig()
+async function removeOldNoticesKeys(client, noticeLifetime) {
+  const sql = SQL`
+    DELETE FROM notices
+    WHERE created_at < CURRENT_TIMESTAMP - ${`${noticeLifetime} mins`}::INTERVAL
+  `
 
-  await createRegistrationMetrics(client)
-  await removeExpiredCodes(client, codeLifetime)
-  await removeExpiredTokens(client, tokenLifetime)
+  const { rowCount } = await client.query(sql)
+
+  console.log(
+    `deleted ${rowCount} notices keys older than ${noticeLifetime} minutes`
+  )
+}
+
+exports.handler = async function() {
+  const {
+    codeLifetime,
+    tokenLifetime,
+    noticeLifetime
+  } = await getExpiryConfig()
+
+  await withDatabase(async client => {
+    await createRegistrationMetrics(client)
+    await removeExpiredCodes(client, codeLifetime)
+    await removeExpiredTokens(client, tokenLifetime)
+    await removeOldNoticesKeys(client, noticeLifetime)
+  })
 
   return true
 }

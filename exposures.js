@@ -4,8 +4,8 @@ const crypto = require('crypto')
 const protobuf = require('protobufjs')
 const SQL = require('@nearform/sql')
 const {
+  withDatabase,
   getAssetsBucket,
-  getDatabase,
   getExposuresConfig,
   runIfDev
 } = require('./utils')
@@ -37,7 +37,7 @@ async function clearExpiredFiles(client, s3, bucket, lastExposureId) {
 async function clearExpiredExposures(client, s3, bucket) {
   const query = SQL`
     DELETE FROM exposures
-    WHERE created_at < CURRENT_TIMESTAMP - INTERVAL '14 days'
+    WHERE created_at < CURRENT_DATE - INTERVAL '14 days'
     RETURNING id
   `
 
@@ -59,7 +59,7 @@ async function uploadFile(firstExposureId, client, s3, bucket, config) {
     ...signatureInfoPayload
   } = config
   const results = {}
-  const exposures = await getExposures(client, firstExposureId)
+  const exposures = await getExposures(client, firstExposureId, config)
 
   let firstExposureCreatedAt = null
   let lastExposureCreatedAt = null
@@ -136,7 +136,7 @@ async function uploadFile(firstExposureId, client, s3, bucket, config) {
   }
 }
 
-async function getExposures(client, since) {
+async function getExposures(client, since, config) {
   const query = SQL`
     SELECT id, created_at, key_data, rolling_period, rolling_start_number, transmission_risk_level, regions
     FROM exposures
@@ -149,22 +149,48 @@ async function getExposures(client, since) {
 
   for (const row of rows) {
     const endDate = new Date(
-      (row.rolling_start_number + row.rolling_period) * 1000 * 600
+      (row.rolling_start_number + row.rolling_period) * 1000 * 600 +
+        config.varianceOffsetMins * 1000 * 60
     )
 
-    if (endDate > new Date()) {
+    if (config.disableValidKeyCheck === false && endDate > new Date()) {
       console.log(
         `re-inserting key ${row.id} for future processing as it is still valid until ${endDate}`
       )
 
-      await client.query(`
+      await client.query(SQL`
         WITH deleted AS (
           DELETE FROM exposures
           WHERE id = ${row.id}
-          RETURNING key_data, rolling_period, rolling_start_number, transmission_risk_level, regions
+          RETURNING
+            key_data,
+            rolling_period,
+            rolling_start_number,
+            transmission_risk_level,
+            regions,
+            test_type,
+            origin,
+            days_since_onset
         )
-        INSERT INTO exposures (key_data, rolling_period, rolling_start_number, transmission_risk_level, regions)
-        SELECT key_data, rolling_period, rolling_start_number, transmission_risk_level, regions
+        INSERT INTO exposures (
+          key_data,
+            rolling_period,
+            rolling_start_number,
+            transmission_risk_level,
+            regions,
+            test_type,
+            origin,
+            days_since_onset
+        )
+        SELECT
+          key_data,
+          rolling_period,
+          rolling_start_number,
+          transmission_risk_level,
+          regions,
+          test_type,
+          origin,
+          days_since_onset
         FROM deleted
       `)
     } else {
@@ -312,21 +338,22 @@ async function uploadExposuresSince(client, s3, bucket, config, since) {
 
 exports.handler = async function() {
   const s3 = new AWS.S3({ region: process.env.AWS_REGION })
-  const client = await getDatabase()
   const bucket = await getAssetsBucket()
   const config = await getExposuresConfig()
   const date = new Date()
 
-  await uploadExposuresSince(client, s3, bucket, config, date)
-
-  date.setHours(0, 0, 0, 0)
-
-  for (let i = 0; i < 14; i++) {
+  await withDatabase(async client => {
     await uploadExposuresSince(client, s3, bucket, config, date)
-    date.setDate(date.getDate() - 1)
-  }
 
-  await clearExpiredExposures(client, s3, bucket)
+    date.setHours(0, 0, 0, 0)
+
+    for (let i = 0; i < 14; i++) {
+      await uploadExposuresSince(client, s3, bucket, config, date)
+      date.setDate(date.getDate() - 1)
+    }
+
+    await clearExpiredExposures(client, s3, bucket)
+  })
 
   return true
 }
