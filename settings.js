@@ -71,17 +71,8 @@ exports.handler = async function() {
   const s3 = new AWS.S3({ region: process.env.AWS_REGION })
   const bucket = await getAssetsBucket()
 
-<<<<<<< HEAD
-  await updateIfChanged(s3, bucket, 'exposures.json', exposures)
-  await updateIfChanged(s3, bucket, 'language.json', language)
-  await updateIfChanged(s3, bucket, 'settings.json', {
-    ...exposures,
-    ...language
-  })
-=======
   return await withDatabase(async client => {
     const { exposures, language } = await getSettingsBody(client)
->>>>>>> current
 
     await updateIfChanged(s3, bucket, 'exposures.json', exposures)
     await updateIfChanged(s3, bucket, 'language.json', language)
